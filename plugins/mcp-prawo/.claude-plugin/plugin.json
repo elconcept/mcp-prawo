@@ -1,6 +1,6 @@
 {
   "name": "mcp-prawo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Polish law MCP workflow, source verification and fulltext status.",
   "author": {
     "name": "elconcept"

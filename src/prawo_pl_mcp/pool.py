@@ -127,6 +127,27 @@ class SourcePool:
             self._clients[source.id] = client
             return client
 
+
+    @staticmethod
+    def _is_closed_session(exc: Exception) -> bool:
+        """Only retry a broken MCP transport, never a source-level error."""
+        message = str(exc).lower()
+        return any(reason in message for reason in (
+            "session terminated", "closedresourceerror", "client is not connected",
+        ))
+
+    async def _invalidate_client(self, source: Source) -> None:
+        """Discard the old remote client before a single reconnect attempt."""
+        lock = await self._lock_for(source.id)
+        async with lock:
+            old = self._clients.pop(source.id, None)
+            self._schemas.pop(source.id, None)
+        if old is not None:
+            try:
+                await asyncio.wait_for(old.__aexit__(None, None, None), timeout=4)
+            except Exception:
+                pass
+
     async def call(self, source: Source, tool: str, arguments: dict) -> str:
         """Wywolaj natywny tool konektora, zwroc tekst.
 
@@ -134,8 +155,15 @@ class SourcePool:
         structured content (FastMCP przy dict/list returns) - bierzemy tekst,
         a gdy pusty, serializujemy structured content do JSON.
         """
-        client = await self.get_client(source)
-        result = await client.call_tool(tool, arguments)
+        for attempt in range(2):
+            client = await self.get_client(source)
+            try:
+                result = await client.call_tool(tool, arguments)
+                break
+            except Exception as exc:
+                if attempt or not self._is_closed_session(exc):
+                    raise
+                await self._invalidate_client(source)
         parts: list[str] = []
         for block in result.content or []:
             text = getattr(block, "text", None)
@@ -165,8 +193,15 @@ class SourcePool:
             cached = self._schemas.get(source.id)
             if cached is not None:
                 return cached
-        client = await self.get_client(source)
-        tools = await client.list_tools()
+        for attempt in range(2):
+            client = await self.get_client(source)
+            try:
+                tools = await client.list_tools()
+                break
+            except Exception as exc:
+                if attempt or not self._is_closed_session(exc):
+                    raise
+                await self._invalidate_client(source)
         out = [
             {
                 "name": t.name,

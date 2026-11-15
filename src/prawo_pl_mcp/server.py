@@ -471,7 +471,7 @@ async def pl_get_document(
         "document_id": (("eli:" + document_id) if s.id == "legal-cite"
                         else s.id + ":" + str(document_id)),
         "origin": "connector",
-        "complete": s.id not in {"eureka", "eu-sparql"},
+        "complete": s.id not in {"eureka", "eu-sparql", "orzeczenia"},
     })
     if metadata.get("source_url"):
         out["source_url"] = metadata["source_url"]
@@ -484,6 +484,13 @@ async def pl_get_document(
     if s.id in {"eureka", "eu-sparql"}:
         out["warning"] = (
             "Native MCP may provide only an extract or metadata, not confirmed full text."
+        )
+    if s.id == "orzeczenia":
+        out["warning"] = (
+            "Full text completeness is unverified by this generic lookup. "
+            "For reliable native pagination, use pl_call(source='orzeczenia', "
+            "tool='get_judgment', arguments={'document_id': ..., 'offset': ..., 'limit': ...}) "
+            "and inspect hasMore/nextOffset in the source response."
         )
     _audited("pl_get_document", s.id, {"document_id": document_id, "page": page},
              started, {"total_chars": out["total_chars"], "page": page})

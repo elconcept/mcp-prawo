@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "mcp-prawo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Polskie źródła prawa: wykorzystanie podłączonego MCP Prawo do przepisów, orzeczeń i dokumentów.",
   "author": {
     "name": "elconcept"

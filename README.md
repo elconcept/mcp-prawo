@@ -216,3 +216,19 @@ This repository is also a plugin marketplace, with one portable skill at `plugin
 - ChatGPT web: import `https://github.com/elconcept/mcp-prawo` as marketplace (branch `main`, empty subfolder), then enable plugin `mcp-prawo`.
 
 See [marketplace docs](docs/PLUGIN_MARKETPLACE.md). The skill does not start the MCP server, inject credentials or grant access to Cloudflare.
+
+
+## Production source coverage (2026-11-15)
+
+The wrapper registers 16 source adapters, with 15 independent NAS services enabled
+in the production Docker stack. External PrawMi is documented but NOT enabled
+because its OAuth/subscription credential is not a reusable upstream connection.
+Private case-file MCP services are deliberately isolated.
+
+The former mcp-ustawy tools have been replaced by the native
+przepis(akt,art,widok) endpoint; use pl_get_document with extra akt for a
+known article. For statute-title discovery use ISAP pl_search(source=isap);
+for semantic case-law discovery use pl_search(source=orzeczenia).
+
+server.json continues to represent the separately published PyPI 0.2.4
+release, not this 0.3.1 Docker/application/plugin version.

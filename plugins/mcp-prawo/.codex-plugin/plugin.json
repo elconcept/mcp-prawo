@@ -1,6 +1,6 @@
 {
   "name": "mcp-prawo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Obsługa już podłączonego polskiego MCP Prawo z rzetelną weryfikacją źródeł.",
   "repository": "https://github.com/elconcept/mcp-prawo",
   "author": {

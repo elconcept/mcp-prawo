@@ -117,6 +117,31 @@ SOURCES: dict[str, Source] = {
             "names with diacritics, e.g. 'Wojewódzki Sąd Administracyjny w Krakowie'.",
         ),
         Source(
+            id="orzeczenia",
+            name="MCP Orzeczenia - local semantic search and judgment retrieval",
+            coverage="Locally indexed Polish court rulings with semantic similarity, "
+            "links to source documents, and exact judgment lookup.",
+            group="pl",
+            runtime="http",
+            package="mcp-orzeczenia",
+            search=SearchSpec(
+                tool="semantic_search",
+                query_param="query",
+                size_param="limit",
+                size_max=20,
+            ),
+            get=GetSpec(
+                tool="get_judgment",
+                id_param="document_id",
+                id_hint="document_id from semantic_search (e.g. prawmi-url:iv-ko-74-26); "
+                "for signature-only lookup use pl_call with sygnatura",
+            ),
+            native_tools=("semantic_search", "get_judgment", "get_judgement"),
+            notes="Source can return paginated/truncated rulings; full completeness "
+            "requires checking returned metadata and offset/limit. Semantic "
+            "score is not evidence of a ruling's current legal force.",
+        ),
+        Source(
             id="legal-cite",
             name="LEGAL-CITE: exact Polish/EU statutory article from live source",
             coverage="Single article or paragraph, including Dz.U. consolidated texts available as PDF.",
@@ -154,29 +179,49 @@ SOURCES: dict[str, Source] = {
         ),
         Source(
             id="ustawy",
-            name="Ustawy - Polish codes and statutes with article commentary (grounding-prawo)",
-            coverage="37 Polish statutes (codes, Constitution, court system, administrative procedure, "
-            "court fees, medical, consumer and tenant law and more): verbatim wording of every article "
-            "from the stated consolidated text plus commentary to every article. Quote verification.",
+            name="Ustawy - Polish statutes and codes with article text and commentary",
+            coverage="Articles of Polish codes and statutes from the local grounding-prawo corpus, "
+            "with provenance and a dated consolidated-text reference.",
             group="pl",
             runtime="http",
             package="mcp-ustawy",
+            search=None,
+            get=GetSpec(
+                tool="przepis",
+                id_param="art",
+                id_hint="article number, e.g. 148, 117^1; pass act alias in extra "
+                "{'akt': 'kk'}; optional extra={'widok': ...} per native schema",
+                required_extra=("akt",),
+            ),
+            native_tools=("przepis",),
+            notes="Current upstream exposes ONE native tool (przepis), not the older "
+            "akty/szukaj/artykul/cytat interface. No free-text search; use ISAP or "
+            "Repertorium to discover acts, then get a known article.",
+        ),
+        Source(
+            id="isap",
+            name="ISAP/ELI - official Polish Journal of Laws",
+            coverage="Official Polish acts and consolidated texts by ELI, with title/year "
+            "lookup and paginated original act text.",
+            group="pl",
+            runtime="http",
+            package="mcp-isap",
             search=SearchSpec(
-                tool="szukaj",
-                query_param="q",
+                tool="search_acts",
+                query_param="title",
                 size_param="limit",
                 size_max=50,
             ),
             get=GetSpec(
-                tool="artykul",
-                id_param="art",
-                id_hint="article number, e.g. 148, 117^1, 43bb; pass the act via extra "
-                "{\"akt\": \"kk\"} (kk, kpk, kc, kpc, kro, kw, kpw, kpa, ppsa, uopl, upk, konstytucja...)",
-                required_extra=("akt",),
+                tool="get_act_text",
+                id_param="eli",
+                id_hint="ELI identifier from search_acts, e.g. DU/2026/1342",
+                page_param="page",
             ),
-            native_tools=("akty", "szukaj", "artykul", "cytat"),
-            notes="Commentary: extra {\"komentarz\": true}. Quote check: pl_call tool=cytat. Acts list: "
-            "pl_call tool=akty. Amendments after the stated consolidated text: check ELI (eli field).",
+            native_tools=("search_acts", "get_act", "get_act_text"),
+            notes="Title-based act lookup (not full-text semantics); "
+            "pl_get_document retrieves native paginated text by ELI, "
+            "pl_call get_act provides act metadata.",
         ),
         Source(
             id="kio",
@@ -207,6 +252,7 @@ SOURCES: dict[str, Source] = {
                 "kio_recent",
                 "kio_by_pzp_article",
                 "kio_get_pdf_url",
+                "kio_coverage",
             ),
             notes="Rate limit 1 req/s upstream. Rulings by PZP article: "
             "pl_call tool=kio_by_pzp_article.",
@@ -347,6 +393,40 @@ SOURCES: dict[str, Source] = {
             ),
             native_tools=("pmi_search", "pmi_get_document", "pmi_get_article", "pmi_list_acts"),
             notes="Statute title search, known-signature ruling lookup and exact article retrieval. For semantic search use free Repertorium.",
+        ),
+        Source(
+            id="prawmi",
+            name="PrawMi external legal MCP - case law, statutes, tax, supervision",
+            coverage="External provider of legal-semantic rulings, statutes, UOKiK, KNF, "
+            "UODO, tax interpretations, EU acts and KRS. May require provider OAuth "
+            "and an appropriate subscription; not a public anonymous endpoint.",
+            group="pl",
+            runtime="http",
+            package="mcp-prawmi-external",
+            search=SearchSpec(
+                tool="search_rulings",
+                query_param="query",
+                size_param="limit",
+                size_max=20,
+            ),
+            get=GetSpec(
+                tool="get_ruling_text",
+                id_param="ruling_link",
+                id_hint="Exact ruling_link returned by PrawMi search_rulings; "
+                "for statutes use pl_call get_article or get_act_text",
+            ),
+            native_tools=(
+                "search_rulings", "verify_ruling", "get_article",
+                "get_ruling_text", "search_acts", "search_rulings_by_article",
+                "search_act_articles", "verify_article_reference",
+                "search_tax_interpretations", "get_tax_document",
+                "search_uodo_decisions", "search_uokik_decisions",
+                "search_knf_positions", "search_eu_regulations",
+                "get_eu_regulation_text", "get_krs_extract", "get_act_text",
+            ),
+            notes="External independent authenticated MCP at api.prawmi.pl. "
+            "Do NOT enable in production without explicit OAuth/service credentials "
+            "and a live tools/list test; never forward another user's session.",
         ),
         Source(
             id="repertorium",

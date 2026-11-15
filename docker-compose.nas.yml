@@ -3,15 +3,18 @@ services:
     build:
       context: /volume2/docker/mcp-prawo
       dockerfile: Dockerfile.nas
-    image: mcp-prawo:0.3.0
+    image: mcp-prawo:0.3.1
     container_name: mcp-prawo
     user: "1029:100"
     environment:
       TZ: Europe/Warsaw
-      PRAWO_PL_MCP_SOURCES: "repertorium,saos,nsa,ms,legal-cite,krs,kio,uodo,pmi,eu-sparql,eureka,eu-compliance"
+      PRAWO_PL_MCP_SOURCES: "repertorium,saos,nsa,ms,legal-cite,krs,kio,uodo,pmi,eu-sparql,eureka,eu-compliance,isap,ustawy,orzeczenia"
       PRAWO_PL_MCP_URL_REPERTORIUM: "http://mcp-repertorium:8000/mcp"
       PRAWO_PL_MCP_URL_SAOS: "http://mcp-saos:8000/mcp"
       PRAWO_PL_MCP_URL_NSA: "http://mcp-nsa:8000/mcp"
+      PRAWO_PL_MCP_URL_ISAP: "http://mcp-isap:8000/mcp"
+      PRAWO_PL_MCP_URL_USTAWY: "http://mcp-ustawy:8080/mcp"
+      PRAWO_PL_MCP_URL_ORZECZENIA: "http://mcp-orzeczenia:8000/mcp"
       PRAWO_PL_MCP_URL_LEGAL_CITE: "http://legal-cite:8080/mcp"
       PRAWO_PL_MCP_URL_KRS: "http://mcp-krs:8000/mcp"
       PRAWO_PL_MCP_URL_KIO: "http://mcp-kio:8000/mcp"
@@ -36,6 +39,9 @@ services:
       - krs
       - repertorium
       - eu_sparql
+      - isap
+      - ustawy
+      - orzeczenia
       - uodo
     ports:
       - "127.0.0.1:8420:8000"
@@ -71,3 +77,12 @@ networks:
   eu_sparql:
     external: true
     name: cf_mcp_eu_sparql
+  isap:
+    external: true
+    name: cf_mcp_isap
+  ustawy:
+    external: true
+    name: cf_mcp_ustawy
+  orzeczenia:
+    external: true
+    name: cf_mcp_orzeczenia
