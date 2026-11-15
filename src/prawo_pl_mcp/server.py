@@ -453,13 +453,63 @@ async def pl_get_document(
         elif s.id == "saos":
             content = await hydrate._saos_full(document_id, _invoke_native)
             metadata = {}
+        elif s.id == "orzeczenia":
+            # Native source paginates its full judgment by offset/limit.
+            # Never apply a second aggregator slice to an already paged chunk.
+            arguments["offset"] = (page - 1) * 5000
+            arguments["limit"] = 5000
+            raw = await _proxy_call(s, spec.tool, arguments)
+            obj = json.loads(raw)
+            docs = obj.get("documents", []) if isinstance(obj, dict) else []
+            if obj.get("status") != "found" or len(docs) != 1:
+                raise LookupError("Orzeczenia returned no uniquely identified judgment")
+            doc = docs[0]
+            if (doc.get("document_id") != document_id
+                    or not isinstance(doc.get("tresc"), str)
+                    or not doc["tresc"].strip()
+                    or doc.get("offset") != arguments["offset"]):
+                raise LookupError("Orzeczenia returned incomplete or inconsistent native text")
+            content = doc["tresc"]
+            metadata = {
+                "source_url": doc.get("url"),
+                "sygnatura": doc.get("sygnatura"),
+                "kompletnosc": doc.get("kompletnosc"),
+                "total_chars": doc.get("dlugosc_calkowita"),
+                "next_offset": doc.get("next_offset"),
+                "has_more": doc.get("has_more"),
+                "native_complete": (
+                    page == 1 and doc.get("kompletnosc") == "full"
+                    and doc.get("has_more") is False
+                ),
+            }
+        elif s.id == "ustawy":
+            raw = await _proxy_call(s, spec.tool, arguments)
+            obj = json.loads(raw)
+            if (not isinstance(obj, dict) or obj.get("status") != "FOUND"
+                    or not isinstance(obj.get("tekst"), str) or not obj["tekst"].strip()):
+                raise LookupError("Ustawy returned no confirmed article text")
+            content = obj["tekst"]
+            if isinstance(obj.get("komentarz"), str) and obj["komentarz"].strip():
+                content += "\n\nKomentarz:\n" + obj["komentarz"]
+            metadata = {
+                key: obj[key] for key in (
+                    "akt", "art", "tytul", "tekst_jednolity", "eli", "zrodlo",
+                    "stan_na", "ostatnia_zmiana", "status",
+                ) if key in obj
+            }
         else:
             raw = await _proxy_call(s, spec.tool, arguments)
             content, metadata = hydrate._decode(raw)
     except (LookupError, ValueError) as exc:
         raise PLLegalError("upstream_error", str(exc)) from exc
 
-    if spec.page_param:
+    if s.id == "orzeczenia":
+        out = {
+            "content": content, "page": page, "page_number": page,
+            "pagination": "native_offset", "total_chars": metadata["total_chars"],
+            "next_offset": metadata["next_offset"], "has_more": metadata["has_more"],
+        }
+    elif spec.page_param:
         out = {"content": content, "page": page, "page_number": page,
                "pagination": "native", "total_chars": len(content)}
     else:
@@ -475,6 +525,13 @@ async def pl_get_document(
     })
     if metadata.get("source_url"):
         out["source_url"] = metadata["source_url"]
+    if s.id == "ustawy":
+        out["content_status"] = "article_only"
+        out["source_metadata"] = metadata
+        out["warning"] = (
+            "The consolidated-text reference and stan_na date must be checked "
+            "against current ISAP/ELI amendments before quoting as current law."
+        )
     if s.id == "legal-cite":
         out["content_status"] = "article_only"
         out["notice"] = (
@@ -486,12 +543,16 @@ async def pl_get_document(
             "Native MCP may provide only an extract or metadata, not confirmed full text."
         )
     if s.id == "orzeczenia":
-        out["warning"] = (
-            "Full text completeness is unverified by this generic lookup. "
-            "For reliable native pagination, use pl_call(source='orzeczenia', "
-            "tool='get_judgment', arguments={'document_id': ..., 'offset': ..., 'limit': ...}) "
-            "and inspect hasMore/nextOffset in the source response."
-        )
+        out["complete"] = metadata["native_complete"]
+        out["source_metadata"] = {
+            "sygnatura": metadata["sygnatura"],
+            "kompletnosc": metadata["kompletnosc"],
+        }
+        if not out["complete"]:
+            out["warning"] = (
+                "Native page only. Read subsequent pages until has_more is false; "
+                "a standalone page is not the full judgment."
+            )
     _audited("pl_get_document", s.id, {"document_id": document_id, "page": page},
              started, {"total_chars": out["total_chars"], "page": page})
     return json.dumps(out, ensure_ascii=False)
