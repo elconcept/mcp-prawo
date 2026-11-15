@@ -1,0 +1,24 @@
+name: marketplace-validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify marketplace manifests
+        run: python3 scripts/verify_marketplace.py
+      - name: Validate Claude Code marketplace
+        run: |
+          npx --yes --package @anthropic-ai/claude-code@2.1.325 claude plugin validate .
+          npx --yes --package @anthropic-ai/claude-code@2.1.325 claude plugin validate ./plugins/mcp-prawo

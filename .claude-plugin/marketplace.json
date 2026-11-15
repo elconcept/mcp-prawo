@@ -1,0 +1,15 @@
+{
+  "name": "elconcept-mcp-prawo",
+  "owner": {
+    "name": "elconcept"
+  },
+  "description": "Polish legal source lookup and MCP usage skills",
+  "plugins": [
+    {
+      "name": "mcp-prawo",
+      "source": "./plugins/mcp-prawo",
+      "displayName": "MCP Prawo",
+      "description": "Instrukcje do polskiego MCP prawa"
+    }
+  ]
+}

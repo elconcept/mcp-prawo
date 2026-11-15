@@ -1,0 +1,18 @@
+{
+  "name": "mcp-prawo",
+  "version": "0.3.0",
+  "description": "Obsługa już podłączonego polskiego MCP Prawo z rzetelną weryfikacją źródeł.",
+  "repository": "https://github.com/elconcept/mcp-prawo",
+  "author": {
+    "name": "elconcept"
+  },
+  "interface": {
+    "displayName": "MCP Prawo",
+    "shortDescription": "Przepisy, orzeczenia i źródła",
+    "longDescription": "Skill dla podłączonego serwera mcp-prawo. Bez lokalnego MCP, hooków i danych dostępowych.",
+    "developerName": "elconcept",
+    "category": "Education & Research",
+    "capabilities": []
+  },
+  "skills": "./skills"
+}

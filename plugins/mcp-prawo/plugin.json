@@ -1,0 +1,33 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mcp-prawo",
+  "version": "0.3.0",
+  "description": "Polskie źródła prawa: wykorzystanie podłączonego MCP Prawo do przepisów, orzeczeń i dokumentów.",
+  "author": {
+    "name": "elconcept"
+  },
+  "repository": "https://github.com/elconcept/mcp-prawo",
+  "keywords": [
+    "polskie prawo",
+    "orzecznictwo",
+    "MCP",
+    "źródła prawa"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "MCP Prawo",
+        "shortDescription": "Przepisy i orzecznictwo przez MCP",
+        "longDescription": "Nawigacja po źródłach polskiego i unijnego prawa za pomocą już podłączonego serwera mcp-prawo. Bez lokalnego MCP, hooków i sekretów.",
+        "developerName": "elconcept",
+        "category": "Education & Research",
+        "capabilities": [],
+        "defaultPrompt": [
+          "Znajdź aktualne przepisy polskiego prawa i podaj źródła.",
+          "Wyszukaj orzecznictwo i rozróżnij fragmenty od pełnych tekstów.",
+          "Pokaż źródła dostępne w mcp-prawo i ich ograniczenia."
+        ]
+      }
+    }
+  }
+}

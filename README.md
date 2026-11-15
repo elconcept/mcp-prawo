@@ -204,3 +204,15 @@ Cloudflare Access to work around any public gateway failure.
 
 See `_PLAN/20261109_plan_wykonawczy_mcp_prawo_pmi_eureka_eu_compliance.md`
 on the audit branch for the full deployment sequence.
+
+## ChatGPT / Codex / Claude marketplace plugin
+
+This repository is also a plugin marketplace, with one portable skill at `plugins/mcp-prawo/skills/prawo-pl-mcp/SKILL.md`. It provides instructions for interacting with the already connected MCP server; authentication and remote MCP configuration remain independent.
+
+- Codex/ChatGPT marketplace: `.agents/plugins/marketplace.json`.
+- Claude Code marketplace: `.claude-plugin/marketplace.json`.
+- Install: `codex plugin marketplace add elconcept/mcp-prawo --ref main` and `codex plugin add mcp-prawo@elconcept-mcp-prawo`.
+- Claude Code: `claude plugin marketplace add elconcept/mcp-prawo` and `claude plugin install mcp-prawo@elconcept-mcp-prawo`.
+- ChatGPT web: import `https://github.com/elconcept/mcp-prawo` as marketplace (branch `main`, empty subfolder), then enable plugin `mcp-prawo`.
+
+See [marketplace docs](docs/PLUGIN_MARKETPLACE.md). The skill does not start the MCP server, inject credentials or grant access to Cloudflare.

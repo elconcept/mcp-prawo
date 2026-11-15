@@ -12,3 +12,10 @@ uv.lock
 .cf-service-token
 .secrets/
 *.bak-before-mcp-prawo-*
+
+# Never publish local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
