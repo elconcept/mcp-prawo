@@ -1,4 +1,4 @@
-"""FastMCP server - 4 unified tools nad flota polskich konektorow prawnych.
+"""FastMCP server - 5 unified tools nad flota polskich konektorow prawnych.
 
 Uruchamianie:
     python -m prawo_pl_mcp
@@ -51,7 +51,7 @@ READ_ONLY = ToolAnnotations(
     openWorldHint=True,  # zrodla to zywe API/scraping (poza eu-compliance offline)
 )
 
-mcp = FastMCP(name="prawo-pl-mcp", instructions=INSTRUCTIONS)
+mcp = FastMCP(name="prawo-pl-mcp", version=__version__, instructions=INSTRUCTIONS)
 
 
 # ---------- helpers ----------

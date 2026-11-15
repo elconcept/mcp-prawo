@@ -1,7 +1,7 @@
 [project]
 name = "prawo-pl-mcp"
 version = "0.3.0"
-description = "One MCP server for Polish legal data - aggregates the matematicsolutions connector fleet (SAOS, NSA, ISAP, KRS, KIO, UODO, ustawy z komentarzem + EU extras) behind 4 unified tools"
+description = "One MCP server for Polish legal data - aggregates separate case law, statute, register, tax and EU sources behind 5 unified tools"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -36,9 +36,9 @@ asgi = [
 prawo-pl-mcp = "prawo_pl_mcp.server:main"
 
 [project.urls]
-Homepage = "https://github.com/matematicsolutions/prawo-pl-mcp"
-Repository = "https://github.com/matematicsolutions/prawo-pl-mcp"
-Issues = "https://github.com/matematicsolutions/prawo-pl-mcp/issues"
+Homepage = "https://github.com/elconcept/mcp-prawo"
+Repository = "https://github.com/elconcept/mcp-prawo"
+Issues = "https://github.com/elconcept/mcp-prawo/issues"
 
 [build-system]
 requires = ["hatchling"]
