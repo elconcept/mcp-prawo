@@ -4,7 +4,7 @@ Personal, independent public-HTML connector for https://prawmi.pl.
 
 No paid PrawMi API or key. No Tor modifications. Runs inside Portainer
 as a separate FastMCP Streamable HTTP server; the existing wrapper accesses
-it over the cf_mcp_krs Docker network.
+it over the cf_edge_mcp Docker network.
 
 ## Native tools
 
@@ -29,9 +29,32 @@ The public acts index itself is not bulk-imported into PostgreSQL.
 ## Source parsing
 
 Ruling: section#section-tresc .ruling-content (checking H1 signature).
-Article: article#przepis div.mt-6.space-y-5 (excluding AI explanation).
-Full law: main article[id^="art-"] (articles retain their labels).
+Article: article#przepis with both multi-paragraph and single-paragraph layouts (excluding UI).
+Full law: main article[id^="art-"] (including grouped/range-number article IDs).
 Index: direct /ustawa/<slug> anchors (currently 895 entries).
+
+## Returned metadata and provenance
+
+- Acts: canonical URL, complete HTML meta tags and Schema.org JSON-LD, original
+  publication (Dz.U.) and derived original ELI, official ISAP links, history
+  link, sections, article identifiers and full statutory text.
+- Article: act title, statutory text and repealed/omitted marker, original
+  publication/ELI, source dateModified when provided, article-to-article links,
+  any detected text-change history, and **linked judgments** with signature,
+  court, date, case URL and actual excerpt.
+- The case lists distinguish `linked_judgments_count` (court cards actually
+  present in HTML) from `site_claimed_judgments_count` (marketing/page title).
+  Case signatures mentioned only in site-generated suggested prompts are
+  separately marked **unlinked and unverified**.
+- Site explanations and FAQ are optional, separate and expressly tagged as
+  unverified editorial material, never merged into statutory text.
+- Rulings: full available ruling text plus court/date/type/panel metadata,
+  site thesis (source-labelled), cited provisions and similar decisions.
+- `original_eli_derived` is calculated from the **original** Dz.U. citation,
+  not proof of the latest consolidated text or validity on a requested date.
+  Detected change dates from PrawMi are not effective dates of amendments.
+
+## Tests
 
 Run self-contained parser tests:
 
