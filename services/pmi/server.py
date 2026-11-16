@@ -194,6 +194,80 @@ def page_metadata(soup: BeautifulSoup) -> dict[str, Any]:
 
 
 
+
+def article_judgments(soup: BeautifulSoup) -> dict[str, Any]:
+    """Only judgments actually linked in HTML, with court/date and excerpt."""
+    section = soup.select_one("section#orzeczenia")
+    if section is None:
+        return {}
+    cases: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in section.select("article"):
+        a = card.select_one('h3 a[href^="/orzeczenie/"]')
+        if a is None:
+            continue
+        href = a.get("href", "").split("?")[0]
+        if not href or href in seen:
+            continue
+        seen.add(href)
+        line = card.select_one("div.flex.flex-wrap")
+        spans = [x.get_text(" ", strip=True) for x in line.find_all("span", recursive=False)
+                 if not x.has_attr("aria-hidden")] if line else []
+        stamp = card.find("time")
+        quote = card.find("blockquote")
+        cases.append({
+            "document_id": "pmi:ruling:" + href.split("/")[-1],
+            "source_url": BASE + href,
+            "signature": spans[0] if spans else "",
+            "court": spans[1] if len(spans) > 1 else "",
+            "date": stamp.get("datetime") if stamp else None,
+            "date_label": stamp.get_text(" ", strip=True) if stamp else None,
+            "title": a.get_text(" ", strip=True),
+            "excerpt": clean_text(quote) if quote else "",
+        })
+    claimed = None
+    for item in [soup.title.get_text(" ", strip=True) if soup.title else "",
+                 soup.select_one('meta[name="description"]').get("content", "")
+                 if soup.select_one('meta[name="description"]') else ""]:
+        m = re.search(r"(\d+)\s+orzecz[eęńi]", item, re.I)
+        if m:
+            claimed = int(m.group(1))
+            break
+    result: dict[str, Any] = {"related_judgments": cases, "linked_judgments_count": len(cases)}
+    if claimed is not None:
+        result["site_claimed_judgments_count"] = claimed
+    return result
+
+
+def article_editorial_material(soup: BeautifulSoup) -> dict[str, Any]:
+    """Store optional site commentary/FAQ separately, never as statutory text."""
+    result: dict[str, Any] = {}
+    explanation = soup.select_one("section#wyjasnienie")
+    if explanation:
+        heading = explanation.find("h2")
+        content = heading.find_next_sibling("div") if heading else None
+        if content:
+            result["site_explanation"] = {
+                "text": clean_text(content),
+                "authority": "unverified_site_editorial_not_primary_law",
+            }
+    faq = soup.select_one("section#pytania")
+    if faq:
+        entries = []
+        for block in faq.select("details"):
+            question = block.find("summary")
+            answer = block.find("p")
+            if question and answer:
+                question_text = question.find("span").get_text(" ", strip=True) if question.find("span") else question.get_text(" ", strip=True)
+                entries.append({"question": question_text, "answer": clean_text(answer)})
+        if entries:
+            result["site_faq"] = {
+                "entries": entries,
+                "authority": "unverified_site_editorial_not_primary_law",
+            }
+    return result
+
+
 def article_change_history(soup: BeautifulSoup) -> dict[str, Any]:
     """PrawMi detection dates are not legal entry-into-force dates."""
     section = soup.select_one("section#historia-zmian")
@@ -350,6 +424,8 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
         **page_metadata(soup),
         **article_source_metadata(soup),
         **article_change_history(soup),
+        **article_judgments(soup),
+        **article_editorial_material(soup),
         "adjacent_articles": adjacent_article_links(soup, slug),
         "content_text": f"{article.replace('art-', 'Art. ')}.\n{content}",
         "total_chars": len(content),
