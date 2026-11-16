@@ -8,7 +8,7 @@ import re
 import time
 import unicodedata
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qs
 
 import httpx
 from bs4 import BeautifulSoup
@@ -245,6 +245,22 @@ def article_judgments(soup: BeautifulSoup) -> dict[str, Any]:
     }
     if claimed is not None:
         result["site_claimed_judgments_count"] = claimed
+    prompts = [
+        parse_qs(urlsplit(a.get("href", "")).query).get("prefill", [""])[0]
+        for a in soup.select('main a[href*="src=article_rulings"]')
+    ]
+    if prompts:
+        prompt = prompts[0]
+        result["site_suggested_ruling_prompt"] = prompt
+        pattern = r"\b[IVXLCM]{1,6}\s+[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]{1,8}\s+\d{1,6}/\d{2,4}\b"
+        linked = {x["signature"].lower() for x in cases}
+        mentioned = list(dict.fromkeys(re.findall(pattern, prompt)))
+        unlinked = [x for x in mentioned if x.lower() not in linked]
+        if unlinked:
+            result["site_suggested_unlinked_case_mentions"] = {
+                "signatures": unlinked,
+                "provenance": "unlinked_suggestions_in_site_prompt_not_verified_citations",
+            }
     return result
 
 
@@ -391,6 +407,67 @@ async def index_acts() -> list[dict[str, str]]:
         return _index_items
 
 
+
+def ruling_page_details(soup: BeautifulSoup) -> dict[str, Any]:
+    """Read court metadata and linked legal grounds as presented by PrawMi."""
+    result: dict[str, Any] = {}
+    details: dict[str, str] = {}
+    root = soup.select_one("section#section-dane")
+    if root:
+        for item in root.select("div.py-1\\.5"):
+            spans = item.find_all("span", recursive=False)
+            if len(spans) >= 2:
+                key = spans[0].get_text(" ", strip=True)
+                value = spans[1].get_text(" ", strip=True)
+                if key and value:
+                    details[key] = value
+        if details:
+            result["case_details"] = details
+            for key, field in {
+                "Data orzeczenia": "ruling_date",
+                "Rodzaj orzeczenia": "ruling_type",
+                "Sąd": "court",
+                "Wydział": "division",
+                "Sędziowie": "judges",
+            }.items():
+                if details.get(key):
+                    result[field] = details[key]
+    for heading in soup.select("main h2"):
+        if heading.get_text(" ", strip=True) == "Teza orzeczenia":
+            thesis = heading.find_next_sibling("p")
+            if thesis:
+                result["site_ruling_thesis"] = {
+                    "text": clean_text(thesis),
+                    "provenance": "prawmi_site_thesis_not_original_disposition",
+                }
+            break
+    provisions = []
+    for a in soup.select('section#section-przepisy a[href^="/ustawa/"]'):
+        spans = a.find_all("span", recursive=False)
+        provisions.append({
+            "citation": spans[0].get_text(" ", strip=True) if spans else "",
+            "act": spans[1].get_text(" ", strip=True) if len(spans) > 1 else "",
+            "source_url": BASE + a["href"],
+        })
+    if provisions:
+        result["cited_provisions"] = provisions
+    similar = []
+    for a in soup.select('section#section-podobne a[href^="/orzeczenie/"]'):
+        heading = a.find("h3")
+        caption = a.find("p")
+        label = caption.get_text(" ", strip=True) if caption else ""
+        parts = [x.strip() for x in label.split("·")]
+        similar.append({
+            "title": heading.get_text(" ", strip=True) if heading else "",
+            "signature": parts[0] if parts else "",
+            "date": parts[1] if len(parts) > 1 else None,
+            "source_url": BASE + a["href"],
+        })
+    if similar:
+        result["similar_rulings"] = similar
+    return result
+
+
 async def get_ruling(signature: str) -> dict[str, Any]:
     slug = ruling_slug(signature)
     url = RULING_BASE + slug
@@ -409,6 +486,8 @@ async def get_ruling(signature: str) -> dict[str, Any]:
         "kind": "ruling",
         "signature": heading.get_text(" ", strip=True),
         "source_url": url,
+        **page_metadata(soup),
+        **ruling_page_details(soup),
         "content_text": content,
         "total_chars": len(content),
     }
