@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import json
 import re
 import time
 import unicodedata
@@ -104,6 +105,47 @@ def clean_text(element: Any) -> str:
     return re.sub(r"\n{3,}", "\n\n", value).strip()
 
 
+def extract_article_content(root: Any) -> str:
+    """Extract text from both paragraph and multi-paragraph PrawMi layouts."""
+    body = root.select_one("div.mt-6.space-y-5")
+    if body is not None:
+        content = clean_text(body)
+    else:
+        panel = root.select_one("div.mt-6.rounded-2xl")
+        paragraphs = panel.select("p.leading-relaxed") if panel else []
+        content = "\n".join(clean_text(p) for p in paragraphs if clean_text(p)).strip()
+    if not content:
+        raise RuntimeError("PrawMi article content is missing or layout changed.")
+    return content
+
+
+def article_source_metadata(soup: BeautifulSoup) -> dict[str, str]:
+    """Read source metadata without treating an original Dz.U. as a current t.j."""
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            payload = json.loads(script.string or script.get_text())
+        except (TypeError, ValueError):
+            continue
+        candidates = payload if isinstance(payload, list) else [payload]
+        for item in candidates:
+            if not isinstance(item, dict) or item.get("@type") != "Article":
+                continue
+            law = item.get("isPartOf")
+            publication = law.get("legislationIdentifier", "") if isinstance(law, dict) else ""
+            modified = item.get("dateModified")
+            result = {}
+            if isinstance(publication, str) and publication:
+                result["publication"] = publication
+                match = re.search(r"Dz\\.?\\s*U\\.?\\s*(\\d{4})\\s*poz\\.?\\s*(\\d+)", publication, flags=re.I)
+                if match:
+                    result["original_eli_derived"] = f"DU/{match.group(1)}/{match.group(2)}"
+                result["publication_scope"] = "original_act_not_current_consolidation"
+            if isinstance(modified, str) and modified:
+                result["source_modified_at"] = modified
+            return result
+    return {}
+
+
 async def index_acts() -> list[dict[str, str]]:
     global _index_items, _index_at
     if _index_items and time.monotonic() - _index_at < INDEX_TTL:
@@ -171,12 +213,7 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
     root = soup.select_one("article#przepis")
     if root is None:
         raise RuntimeError("PrawMi article container missing.")
-    body = root.select_one("div.mt-6.space-y-5")
-    if body is None:
-        raise RuntimeError("PrawMi article text selector changed.")
-    content = clean_text(body)
-    if len(content) < 10:
-        raise RuntimeError("PrawMi article text is empty.")
+    content = extract_article_content(root)
     act_title = root.select_one("p.text-sm")
     return {
         "document_id": f"pmi:article:{slug}:{article}",
@@ -184,6 +221,7 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
         "title": act_title.get_text(" ", strip=True) if act_title else slug,
         "article": article,
         "source_url": url,
+        **article_source_metadata(soup),
         "content_text": f"{article.replace('art-', 'Art. ')}.\n{content}",
         "total_chars": len(content),
     }
