@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from server import (article_id, ruling_slug, safe_slug, fold, extract_article_content,
                     article_source_metadata, act_source_metadata, page_metadata,
                     article_judgments, article_change_history, article_editorial_material,
-                    adjacent_article_links, ACT_NODE_ID)
+                    adjacent_article_links, ruling_page_details, ACT_NODE_ID)
 
 
 class PmiParsersTest(unittest.TestCase):
@@ -148,6 +148,46 @@ class PmiParsersTest(unittest.TestCase):
         </main>""", "html.parser")
         links = adjacent_article_links(soup, "kodeks-cywilny")
         self.assertEqual([x["article"] for x in links], ["414", "416"])
+
+
+
+    def test_ruling_page_metadata_and_cited_provisions(self):
+        html = """<main>
+        <section id="section-dane">
+        <div class="py-1.5"><span>Sygnatura</span><span>XIII GC 1723/14</span></div>
+        <div class="py-1.5"><span>Data orzeczenia</span><span>2016-02-19</span></div>
+        <div class="py-1.5"><span>Rodzaj orzeczenia</span><span>wyrok</span></div>
+        <div class="py-1.5"><span>Sąd</span><span>Sąd Rejonowy w Łodzi</span></div>
+        <div class="py-1.5"><span>Sędziowie</span><span>Justyna Kasper</span></div>
+        </section>
+        <div><h2>Teza orzeczenia</h2><p>Szkoda została naprawiona.</p></div>
+        <section id="section-przepisy">
+        <a href="/ustawa/kodeks-cywilny/art-415"><span>Art. 415.</span>
+        <span>Kodeks cywilny</span></a></section>
+        <section id="section-podobne">
+        <a href="/orzeczenie/v-c-533-14"><h3>Cesja wierzytelności</h3>
+        <p>V C 533/14 · 2014-11-14</p></a></section>
+        </main>"""
+        data = ruling_page_details(BeautifulSoup(html, "html.parser"))
+        self.assertEqual(data["ruling_date"], "2016-02-19")
+        self.assertEqual(data["court"], "Sąd Rejonowy w Łodzi")
+        self.assertEqual(data["judges"], "Justyna Kasper")
+        self.assertEqual(data["cited_provisions"][0]["citation"], "Art. 415.")
+        self.assertEqual(data["similar_rulings"][0]["signature"], "V C 533/14")
+        self.assertEqual(data["site_ruling_thesis"]["provenance"],
+                         "prawmi_site_thesis_not_original_disposition")
+
+    def test_unlinked_case_mentions_are_marked_not_verified(self):
+        html = """<html><body><main>
+        <section id="orzeczenia"><article><div class="flex flex-wrap">
+        <span>II AKa 230/22</span><span>Sąd Apelacyjny</span>
+        </div><h3><a href="/orzeczenie/ii-aka-230-22">II AKa 230/22</a></h3></article></section>
+        <a href="/czat?prefill=Por%C3%B3wnaj%20II%20AKa%20230%2F22%2C%20VIII%20Ko%20137%2F17&src=article_rulings">Sprawdź</a>
+        </main></body></html>"""
+        data = article_judgments(BeautifulSoup(html, "html.parser"))
+        self.assertEqual(data["linked_judgments_count"], 1)
+        self.assertEqual(data["site_suggested_unlinked_case_mentions"]["signatures"],
+                         ["VIII Ko 137/17"])
 
 
 
