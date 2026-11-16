@@ -192,6 +192,31 @@ def page_metadata(soup: BeautifulSoup) -> dict[str, Any]:
     return result
 
 
+
+def act_source_metadata(soup: BeautifulSoup) -> dict[str, Any]:
+    """Expose machine-readable legislation identity without asserting currency."""
+    schemas = page_metadata(soup)["schema_org"]
+    legislation = [
+        node for node in schemas
+        if node.get("@type") == "Legislation" and node.get("legislationIdentifier")
+    ]
+    if not legislation:
+        return {}
+    preferred = next((x for x in legislation if x.get("legislationType")), legislation[0])
+    out: dict[str, Any] = {"publication": preferred["legislationIdentifier"]}
+    match = re.search(r"Dz\.?\s*U\.?\s*(\d{4})\s*poz\.?\s*(\d+)", out["publication"], flags=re.I)
+    if match:
+        out["original_eli_derived"] = f"DU/{match.group(1)}/{match.group(2)}"
+        out["publication_scope"] = "original_act_not_current_consolidation"
+    for key in ("legislationType", "legislationDate", "datePublished", "dateEnacted", "inLanguage"):
+        if preferred.get(key):
+            out[key] = preferred[key]
+    jurisdiction = preferred.get("jurisdiction")
+    if isinstance(jurisdiction, dict) and jurisdiction.get("name"):
+        out["jurisdiction"] = jurisdiction["name"]
+    return out
+
+
 def act_sections(soup: BeautifulSoup) -> list[str]:
     """List legal section headings, excluding navigation and promotional headings."""
     headings = []
@@ -312,7 +337,9 @@ async def get_act(slug: str) -> dict[str, Any]:
         "title": heading.get_text(" ", strip=True),
         "source_url": url,
         **page_metadata(soup),
+        **act_source_metadata(soup),
         "sections": act_sections(soup),
+        "article_ids": [node["id"] for node in articles if ACT_NODE_ID.fullmatch(node["id"])],
         "article_count": len(chunks),
         "content_text": content,
         "total_chars": len(content),
