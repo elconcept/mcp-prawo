@@ -31,7 +31,7 @@ class PmiParsersTest(unittest.TestCase):
     def test_article_multi_paragraph_layout(self):
         html = '<article id="przepis"><div class="mt-6 space-y-5"><p>§ 1. A</p><p>§ 2. B</p></div></article>'
         root = BeautifulSoup(html, "html.parser").select_one("article#przepis")
-        self.assertEqual(extract_article_content(root), "§ 1. A\\n§ 2. B")
+        self.assertEqual(extract_article_content(root), "§ 1. A\n§ 2. B")
 
     def test_article_single_paragraph_layout(self):
         html = '<article id="przepis"><div class="mt-6 rounded-2xl"><p class="text-xl leading-relaxed">Kto z winy swej wyrządził szkodę.</p></div></article>'
