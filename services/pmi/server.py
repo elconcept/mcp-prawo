@@ -233,7 +233,16 @@ def article_judgments(soup: BeautifulSoup) -> dict[str, Any]:
         if m:
             claimed = int(m.group(1))
             break
-    result: dict[str, Any] = {"related_judgments": cases, "linked_judgments_count": len(cases)}
+    topic_filters = [
+        button.get_text(" ", strip=True)
+        for button in section.select("button")
+        if button.get_text(" ", strip=True) not in ("", "Wszystkie tematy")
+    ]
+    result: dict[str, Any] = {
+        "related_judgments": cases,
+        "linked_judgments_count": len(cases),
+        "judgment_topic_filters": list(dict.fromkeys(topic_filters)),
+    }
     if claimed is not None:
         result["site_claimed_judgments_count"] = claimed
     return result
@@ -414,12 +423,19 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
     if root is None:
         raise RuntimeError("PrawMi article container missing.")
     content = extract_article_content(root)
+    norm = content.strip().lower()
+    text_status = (
+        "repealed" if norm in ("(uchylony)", "(uchylona)")
+        else "omitted" if norm in ("(pominięty)", "(pominięte)", "(pominięta)")
+        else "text_present"
+    )
     act_title = root.select_one("p.text-sm")
     return {
         "document_id": f"pmi:article:{slug}:{article}",
         "kind": "article",
         "title": act_title.get_text(" ", strip=True) if act_title else slug,
         "article": article,
+        "text_status": text_status,
         "source_url": url,
         **page_metadata(soup),
         **article_source_metadata(soup),
