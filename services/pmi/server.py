@@ -22,6 +22,7 @@ USER_AGENT = "pmi-personal-mcp/1.0"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "text/html"}
 ACT_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 ARTICLE_ID = re.compile(r"^art-[0-9]+[a-z]?(?:-[a-z])?$")
+ACT_NODE_ID = re.compile(r"^art-[0-9]+[a-z]?(?:-[0-9]+[a-z]?)?$")
 RULING_SIG = re.compile(r"^[A-ZĄĆĘŁŃÓŚŹŻ0-9IVXLCM.\-\s]{1,18}\s+[A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż]{1,8}\s+\d+/\d{2,4}$", re.I)
 DZIENNIK = re.compile(r"(?:Dz\.?\s*U\.?\s*\d{4}\s*poz\.?\s*\d+)", re.I)
 INDEX_TTL = 3600.0
@@ -146,6 +147,62 @@ def article_source_metadata(soup: BeautifulSoup) -> dict[str, str]:
     return {}
 
 
+
+def page_metadata(soup: BeautifulSoup) -> dict[str, Any]:
+    """Preserve source HTML metadata and linked official references."""
+    meta: dict[str, str] = {}
+    for tag in soup.select("head meta[content]"):
+        key = tag.get("name") or tag.get("property") or tag.get("http-equiv")
+        if key:
+            meta[key] = tag.get("content", "")
+    json_ld: list[dict[str, Any]] = []
+    for tag in soup.select('script[type="application/ld+json"]'):
+        try:
+            obj = json.loads(tag.string or tag.get_text())
+        except (TypeError, ValueError):
+            continue
+        items = obj if isinstance(obj, list) else [obj]
+        json_ld.extend(x for x in items if isinstance(x, dict))
+    canonical = soup.select_one('link[rel="canonical"][href]')
+    official_links: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for a in soup.select("main a[href]"):
+        href = a.get("href", "")
+        if (href.startswith("https://isap.sejm.gov.pl/")
+                or href.startswith("https://api.sejm.gov.pl/")
+                or href.startswith("https://eli.gov.pl/")) and href not in seen:
+            seen.add(href)
+            official_links.append({"url": href, "label": a.get_text(" ", strip=True)})
+    history = [
+        {"url": BASE + a["href"], "label": a.get_text(" ", strip=True)}
+        for a in soup.select('main a[href^="/ustawa/"]')
+        if a["href"].split("?")[0].rstrip("/").endswith("/zmiany")
+    ]
+    result: dict[str, Any] = {
+        "html_title": soup.title.get_text(" ", strip=True) if soup.title else "",
+        "html_lang": soup.html.get("lang", "") if soup.html else "",
+        "html_meta": meta,
+        "schema_org": json_ld,
+        "official_links": official_links,
+    }
+    if canonical:
+        result["canonical_url"] = canonical["href"]
+    if history:
+        result["history_links"] = history
+    return result
+
+
+def act_sections(soup: BeautifulSoup) -> list[str]:
+    """List legal section headings, excluding navigation and promotional headings."""
+    headings = []
+    for node in soup.select("main h2,main h3,main h4"):
+        title = node.get_text(" ", strip=True)
+        if re.match(r"^(Rozdział|Dział|Tytuł|Księga|Oddział|Część|Sekcja)\b", title, re.I):
+            if title not in headings:
+                headings.append(title)
+    return headings
+
+
 async def index_acts() -> list[dict[str, str]]:
     global _index_items, _index_at
     if _index_items and time.monotonic() - _index_at < INDEX_TTL:
@@ -221,6 +278,7 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
         "title": act_title.get_text(" ", strip=True) if act_title else slug,
         "article": article,
         "source_url": url,
+        **page_metadata(soup),
         **article_source_metadata(soup),
         "content_text": f"{article.replace('art-', 'Art. ')}.\n{content}",
         "total_chars": len(content),
@@ -238,7 +296,7 @@ async def get_act(slug: str) -> dict[str, Any]:
     chunks = []
     for node in articles:
         art = node.get("id", "")
-        if not ARTICLE_ID.fullmatch(art):
+        if not ACT_NODE_ID.fullmatch(art):
             continue
         children = [n for n in node.find_all(recursive=False) if getattr(n, "name", None)]
         body = children[-1] if len(children) >= 2 else node
@@ -253,6 +311,8 @@ async def get_act(slug: str) -> dict[str, Any]:
         "kind": "act",
         "title": heading.get_text(" ", strip=True),
         "source_url": url,
+        **page_metadata(soup),
+        "sections": act_sections(soup),
         "article_count": len(chunks),
         "content_text": content,
         "total_chars": len(content),
