@@ -193,6 +193,50 @@ def page_metadata(soup: BeautifulSoup) -> dict[str, Any]:
 
 
 
+
+def article_change_history(soup: BeautifulSoup) -> dict[str, Any]:
+    """PrawMi detection dates are not legal entry-into-force dates."""
+    section = soup.select_one("section#historia-zmian")
+    if section is None:
+        return {}
+    note = section.find("p", recursive=False)
+    list_node = section.find("ol", recursive=False)
+    changes = []
+    if list_node is not None:
+        for item in list_node.find_all("li", recursive=False):
+            header = item.find("h3")
+            if not header:
+                continue
+            heading = header.get_text(" ", strip=True)
+            date = re.search(r"(\d{2}\.\d{2}\.\d{4})", heading)
+            status_tag = header.find_next_sibling("span")
+            entry: dict[str, Any] = {
+                "heading": heading,
+                "detected_on": date.group(1) if date else None,
+                "change_type": status_tag.get_text(" ", strip=True) if status_tag else None,
+                "detail": item.get_text("\n", strip=True),
+            }
+            changes.append(entry)
+    return {
+        "history_detection_note": note.get_text(" ", strip=True) if note else "",
+        "article_change_history": changes,
+    }
+
+
+def adjacent_article_links(soup: BeautifulSoup, slug: str) -> list[dict[str, str]]:
+    """Expose explicit navigation links without inventing adjacency."""
+    prefix = "/ustawa/" + slug + "/art-"
+    result = []
+    for a in soup.select("main a[href]"):
+        href = a.get("href", "").split("?")[0]
+        if href.startswith(prefix):
+            link = {"article": href[len(prefix):], "url": BASE + href,
+                    "label": a.get_text(" ", strip=True)}
+            if link not in result:
+                result.append(link)
+    return result
+
+
 def act_source_metadata(soup: BeautifulSoup) -> dict[str, Any]:
     """Expose machine-readable legislation identity without asserting currency."""
     schemas = page_metadata(soup)["schema_org"]
@@ -305,6 +349,8 @@ async def get_article(act: str, article: str) -> dict[str, Any]:
         "source_url": url,
         **page_metadata(soup),
         **article_source_metadata(soup),
+        **article_change_history(soup),
+        "adjacent_articles": adjacent_article_links(soup, slug),
         "content_text": f"{article.replace('art-', 'Art. ')}.\n{content}",
         "total_chars": len(content),
     }
