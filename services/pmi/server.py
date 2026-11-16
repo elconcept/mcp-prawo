@@ -136,7 +136,7 @@ def article_source_metadata(soup: BeautifulSoup) -> dict[str, str]:
             result = {}
             if isinstance(publication, str) and publication:
                 result["publication"] = publication
-                match = re.search(r"Dz\\.?\\s*U\\.?\\s*(\\d{4})\\s*poz\\.?\\s*(\\d+)", publication, flags=re.I)
+                match = re.search(r"Dz\.?\s*U\.?\s*(\d{4})\s*poz\.?\s*(\d+)", publication, flags=re.I)
                 if match:
                     result["original_eli_derived"] = f"DU/{match.group(1)}/{match.group(2)}"
                 result["publication_scope"] = "original_act_not_current_consolidation"
