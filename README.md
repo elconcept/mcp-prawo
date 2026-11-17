@@ -60,7 +60,6 @@ Turkish law: 16 institutions, one server. prawo-pl-mcp does the same for Poland:
 | `nsa` | Case law: administrative courts (NSA + 16 WSA) | [CBOSA](https://orzeczenia.nsa.gov.pl) | [mcp-nsa](https://github.com/matematicsolutions/mcp-nsa) | npx |
 | `legal-cite` | Exact statutory articles, including PDF-only Dz.U. | ELI/Dz.U. | LEGAL-CITE (independent MCP) | http |
 | `krs` | Company register: extracts, history, board composition | [KRS API (Ministry of Justice)](https://api-krs.ms.gov.pl) | [mcp-krs](https://github.com/matematicsolutions/mcp-krs) | npx |
-| `ustawy` | 37 statutes: article wording from the consolidated text and commentary to every article | commentary repos (grounding-prawo) | `mcp-ustawy` (remote, `PRAWO_PL_MCP_URL_USTAWY`) | http |
 | `kio` | Public procurement: National Appeal Chamber rulings | [orzeczenia.uzp.gov.pl](https://orzeczenia.uzp.gov.pl) | [kio-orzeczenia-mcp](https://github.com/matematicsolutions/kio-orzeczenia-mcp) | uvx |
 | `uodo` | GDPR enforcement: Polish DPA decisions, fines, stats | [orzeczenia.uodo.gov.pl](https://orzeczenia.uodo.gov.pl) | [uodo-orzeczenia-mcp](https://github.com/matematicsolutions/uodo-orzeczenia-mcp) | uvx |
 | `eu-sparql` | EU law: EUR-Lex by CELEX, CJEU by ECLI, GDPRhub | [Cellar SPARQL](https://op.europa.eu/en/web/cellar) | [mcp-eu-sparql](https://github.com/matematicsolutions/mcp-eu-sparql) | npx |
@@ -179,9 +178,8 @@ and attribution requirements continue to apply.
 ## Deployment for grounding-prawo (NAS)
 
 `deploy/grounding-prawo/` runs one wrapper (`mcp-prawo`, Streamable HTTP `/mcp`) in front of the connectors already
-deployed as containers: `saos` (local SAOS dump), `nsa` and `ustawy` (codes and statutes with commentary from
-`elconcept/grounding-prawo`, `deploy/mcp-ustawy`). The portal `lex` then needs a single server `prawo`
-instead of `saos`, `nsa`, `cite` and `isap`.
+deployed as containers: `saos` (local SAOS dump), `nsa`, `legal-cite`, and `pmi`.
+The portal `lex` can expose the `mcp-prawo` aggregator alongside specialized providers.
 
 
 ## Synology deployment state (2026-11-09)
@@ -189,9 +187,10 @@ instead of `saos`, `nsa`, `cite` and `isap`.
 `docker-compose.nas.yml` is a **proposed** replacement for the production
 Portainer stack 58, not an indication that the stack has been redeployed.
 Both EUREKA (stack 64) and EU-COMPLIANCE (stack 65) are separately deployed.
-The legacy ISAP service and PostgreSQL stack must remain untouched until
-separate, explicit retirement approval. The wrapper deliberately does not
-connect to or delete their data.
+On 2026-11-17, the owner approved retirement of the independent ISAP and
+USTAWY endpoints. ISAP deployment files and data are preserved on the NAS;
+USTAWY is removed from NAS, while its historical GitHub sources remain.
+Neither source is registered in this wrapper.
 
 Before any production switch: prepare and verify access to
 `/volume1/legal/opracowania/zrodla_prawne_mcp` under user `1029:100`,
@@ -220,15 +219,13 @@ See [marketplace docs](docs/PLUGIN_MARKETPLACE.md). The skill does not start the
 
 ## Production source coverage (2026-11-15)
 
-The wrapper registers 16 source adapters, with 15 independent NAS services enabled
-in the production Docker stack. External PrawMi is documented but NOT enabled
-because its OAuth/subscription credential is not a reusable upstream connection.
+The wrapper registers 14 source adapters. PMI is enabled as a local upstream
+serving public PrawMi HTML. The independent ISAP and USTAWY adapters are retired.
 Private case-file MCP services are deliberately isolated.
 
-The former mcp-ustawy tools have been replaced by the native
-przepis(akt,art,widok) endpoint; use pl_get_document with extra akt for a
-known article. For statute-title discovery use ISAP pl_search(source=isap);
-for semantic case-law discovery use pl_search(source=orzeczenia).
+For exact Polish statutory articles, use `legal-cite` or PrawMi (`pmi`).
+For case-law discovery use Repertorium/Orzeczenia; the local archives with
+AI-generated statute commentary are not treated as authoritative law.
 
 server.json continues to represent the separately published PyPI 0.2.4
 release, not this 0.3.1 Docker/application/plugin version.
