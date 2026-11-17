@@ -19,8 +19,13 @@ def test_groups_valid():
 
 
 def test_core_pl_sources_present():
-    for expected in ("saos", "nsa", "legal-cite", "krs", "kio", "uodo", "ustawy", "pmi", "eureka", "eu-compliance"):
+    for expected in ("saos", "nsa", "legal-cite", "krs", "kio", "uodo", "pmi", "eureka", "eu-compliance"):
         assert expected in SOURCES, f"Brak zrodla '{expected}' w registry"
+
+
+def test_retired_sources_not_registered():
+    assert "isap" not in SOURCES
+    assert "ustawy" not in SOURCES
 
 
 def test_search_specs_consistent():
