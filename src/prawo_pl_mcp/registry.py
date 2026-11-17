@@ -178,52 +178,6 @@ SOURCES: dict[str, Source] = {
             "default) | S (associations/foundations), pass via extra.",
         ),
         Source(
-            id="ustawy",
-            name="Ustawy - Polish statutes and codes with article text and commentary",
-            coverage="Articles of Polish codes and statutes from the local grounding-prawo corpus, "
-            "with provenance and a dated consolidated-text reference.",
-            group="pl",
-            runtime="http",
-            package="mcp-ustawy",
-            search=None,
-            get=GetSpec(
-                tool="przepis",
-                id_param="art",
-                id_hint="article number, e.g. 148, 117^1; pass act alias in extra "
-                "{'akt': 'kk'}; optional extra={'widok': ...} per native schema",
-                required_extra=("akt",),
-            ),
-            native_tools=("przepis",),
-            notes="Current upstream exposes ONE native tool (przepis), not the older "
-            "akty/szukaj/artykul/cytat interface. No free-text search; use ISAP or "
-            "Repertorium to discover acts, then get a known article.",
-        ),
-        Source(
-            id="isap",
-            name="ISAP/ELI - official Polish Journal of Laws",
-            coverage="Official Polish acts and consolidated texts by ELI, with title/year "
-            "lookup and paginated original act text.",
-            group="pl",
-            runtime="http",
-            package="mcp-isap",
-            search=SearchSpec(
-                tool="search_acts",
-                query_param="title",
-                size_param="limit",
-                size_max=50,
-            ),
-            get=GetSpec(
-                tool="get_act_text",
-                id_param="eli",
-                id_hint="ELI identifier from search_acts, e.g. DU/2026/1342",
-                page_param="page",
-            ),
-            native_tools=("search_acts", "get_act", "get_act_text"),
-            notes="Title-based act lookup (not full-text semantics); "
-            "pl_get_document retrieves native paginated text by ELI, "
-            "pl_call get_act provides act metadata.",
-        ),
-        Source(
             id="kio",
             name="KIO - National Appeal Chamber (public procurement)",
             coverage="KIO rulings from orzeczenia.uzp.gov.pl. Search by PZP article, "
