@@ -482,21 +482,6 @@ async def pl_get_document(
                     and doc.get("has_more") is False
                 ),
             }
-        elif s.id == "ustawy":
-            raw = await _proxy_call(s, spec.tool, arguments)
-            obj = json.loads(raw)
-            if (not isinstance(obj, dict) or obj.get("status") != "FOUND"
-                    or not isinstance(obj.get("tekst"), str) or not obj["tekst"].strip()):
-                raise LookupError("Ustawy returned no confirmed article text")
-            content = obj["tekst"]
-            if isinstance(obj.get("komentarz"), str) and obj["komentarz"].strip():
-                content += "\n\nKomentarz:\n" + obj["komentarz"]
-            metadata = {
-                key: obj[key] for key in (
-                    "akt", "art", "tytul", "tekst_jednolity", "eli", "zrodlo",
-                    "stan_na", "ostatnia_zmiana", "status",
-                ) if key in obj
-            }
         else:
             raw = await _proxy_call(s, spec.tool, arguments)
             content, metadata = hydrate._decode(raw)
@@ -525,13 +510,6 @@ async def pl_get_document(
     })
     if metadata.get("source_url"):
         out["source_url"] = metadata["source_url"]
-    if s.id == "ustawy":
-        out["content_status"] = "article_only"
-        out["source_metadata"] = metadata
-        out["warning"] = (
-            "The consolidated-text reference and stan_na date must be checked "
-            "against current ISAP/ELI amendments before quoting as current law."
-        )
     if s.id == "legal-cite":
         out["content_status"] = "article_only"
         out["notice"] = (
