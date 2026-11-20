@@ -10,17 +10,14 @@ they run as separate Portainer stacks accessed through internal Streamable HTTP;
 stdio (npx/uvx) remains available for standalone use. The wrapper is not a
 second search engine or a store of embedded case-law documents.
 
-"Prawo" is Polish for "law"; the name follows yargi-mcp's move of naming a
-country server in its own language.
-
 ## Why an aggregator
 
 The connectors cover Polish legal data well, but as separate MCP servers, one
-per database - ten installs and ten config entries before the first question.
+per database - separate installations and configuration entries before the first question.
 [yargi-mcp](https://github.com/saidsurucu/yargi-mcp) showed the fix for
 Turkish law: 16 institutions, one server. prawo-pl-mcp does the same for Poland:
 
-- Five tools instead of 42. `pl_list_sources`, `pl_search`, `pl_get_document`,
+- Five unified tools. `pl_list_sources`, `pl_search`, `pl_get_document`,
   `pl_call` and `pl_coverage` - fewer tool schemas means less context spent before the LLM starts
   working.
 - One convention. The connectors grew organically: `dateFrom` here, `date_from`
@@ -124,7 +121,7 @@ Open by default (public, read-only data). Set `PRAWO_PL_MCP_API_KEY` to require
 
 | Env | Default | Meaning |
 |---|---|---|
-| `PRAWO_PL_MCP_SOURCES` | - | Comma list of exposed sources, e.g. `saos,nsa,ustawy`; empty = all. |
+| `PRAWO_PL_MCP_SOURCES` | - | Comma list of exposed sources, e.g. `saos,nsa,pmi`; empty = all. |
 | `PRAWO_PL_MCP_URL_<ID>` | - | Use an already deployed MCP server (Streamable HTTP) for a source instead of spawning it, e.g. `PRAWO_PL_MCP_URL_SAOS=http://10.0.10.201:8402/mcp`. Required for `http` sources. |
 | `PRAWO_PL_MCP_CMD_<ID>` | - | Override the spawn command for a source, e.g. `PRAWO_PL_MCP_CMD_SAOS="node C:/dev/mcp-saos/dist/index.js"` for a local checkout. `<ID>` = source id, uppercase, `-` → `_`. |
 | `PRAWO_PL_MCP_INIT_TIMEOUT` | `180` | Seconds allowed for a connector's first start (includes package download). |
@@ -175,34 +172,9 @@ aggregator preserves source provenance and stores fetched Markdown files in
 the specifically mounted legal source folder; each upstream source's limits
 and attribution requirements continue to apply.
 
-## Deployment for grounding-prawo (NAS)
+## NAS deployment
 
-`deploy/grounding-prawo/` runs one wrapper (`mcp-prawo`, Streamable HTTP `/mcp`) in front of the connectors already
-deployed as containers: `saos` (local SAOS dump), `nsa`, `legal-cite`, and `pmi`.
-The portal `lex` can expose the `mcp-prawo` aggregator alongside specialized providers.
-
-
-## Synology deployment state (2026-11-09)
-
-`docker-compose.nas.yml` is a **proposed** replacement for the production
-Portainer stack 58, not an indication that the stack has been redeployed.
-Both EUREKA (stack 64) and EU-COMPLIANCE (stack 65) are separately deployed.
-On 2026-11-17, the owner approved retirement of the independent ISAP and
-USTAWY endpoints. ISAP deployment files and data are preserved on the NAS;
-USTAWY is removed from NAS, while its historical GitHub sources remain.
-Neither source is registered in this wrapper.
-
-Before any production switch: prepare and verify access to
-`/volume1/legal/opracowania/zrodla_prawne_mcp` under user `1029:100`,
-without changing the ownership of the entire legal repository; perform live
-`tools/list` and `tools/call` against the internal MCP endpoints; verify
-the Repertorium default-text compatibility and JSON contract; test cold
-LEGAL-CITE and multiple authentic full-text results; run offline regression
-tests and a real end-to-end Markdown write/page-read test. Do not disable
-Cloudflare Access to work around any public gateway failure.
-
-See `_PLAN/20261109_plan_wykonawczy_mcp_prawo_pmi_eureka_eu_compliance.md`
-on the audit branch for the full deployment sequence.
+The Synology deployment runs the `mcp-prawo` wrapper via Streamable HTTP (`/mcp`) and routes requests to independently deployed MCP services. The Portainer container has a read-write bind mount from `/volume1/legal/opracowania/zrodla_prawne_mcp` on the host to `/legal_sources` inside the wrapper. The current live set of connectors must be checked through `pl_list_sources(source_id=...)`; registering a source or setting its URL alone does not establish health.
 
 ## ChatGPT / Codex / Claude marketplace plugin
 
@@ -217,15 +189,10 @@ This repository is also a plugin marketplace, with one portable skill at `plugin
 See [marketplace docs](docs/PLUGIN_MARKETPLACE.md). The skill does not start the MCP server, inject credentials or grant access to Cloudflare.
 
 
-## Production source coverage (2026-11-15)
+## Source registration and production verification
 
-The wrapper registers 14 source adapters. PMI is enabled as a local upstream
-serving public PrawMi HTML. The independent ISAP and USTAWY adapters are retired.
-Private case-file MCP services are deliberately isolated.
+The wrapper defines 14 source adapters in `src/prawo_pl_mcp/registry.py`. The enabled subset depends on `PRAWO_PL_MCP_SOURCES` and runtime connector availability. `pl_list_sources` describes the configured catalog; live connectivity must be checked with `pl_list_sources(source_id=...)` and an actual source tool call.
 
-For exact Polish statutory articles, use `legal-cite` or PrawMi (`pmi`).
-For case-law discovery use Repertorium/Orzeczenia; the local archives with
-AI-generated statute commentary are not treated as authoritative law.
+For exact Polish statutory articles use `legal-cite` or `pmi`; for case-law discovery use `repertorium` or `orzeczenia`. Private case-file services are not connected to this legal-data aggregator.
 
-server.json continues to represent the separately published PyPI 0.2.4
-release, not this 0.3.1 Docker/application/plugin version.
+The Docker/application/plugin version is `0.3.1`; the separately published PyPI descriptor in `server.json` may have a different version.
